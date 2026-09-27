@@ -1,5 +1,4 @@
 const TMDB_API_BASE = 'https://api.themoviedb.org/3'
-const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 
 export type TmdbMovie = {
   tmdbId: number
@@ -22,8 +21,10 @@ const apiKey = import.meta.env.VITE_TMDB_API_KEY?.trim()
 
 export const isTmdbConfigured = Boolean(accessToken || apiKey)
 
-export function posterUrl(posterPath: string | null, size: 'w92' | 'w185' = 'w185') {
-  return posterPath ? `${TMDB_IMAGE_BASE}/${size}${posterPath}` : null
+export function posterUrl(posterPath: string | null) {
+  // TMDB's CDN does not allow a browser to use its images as WebGL textures.
+  // The Vercel route serves the exact TMDB image from this app's origin instead.
+  return posterPath ? `/api/tmdb-poster?path=${encodeURIComponent(posterPath)}` : null
 }
 
 export async function searchMovies(query: string, signal?: AbortSignal): Promise<TmdbMovie[]> {
