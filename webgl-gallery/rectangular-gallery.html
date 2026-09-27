@@ -40,12 +40,14 @@
         </div>
         <button id="share-gallery-close" class="panel-close" type="button" aria-label="Close Save and Share">×</button>
       </header>
-      <p class="share-gallery-copy">Save a read-only snapshot of this gallery, including its movie placements and visual theme. Friends with the link can walk through it, but cannot edit it.</p>
+      <p class="share-gallery-copy">Create a private editing link for yourself and a separate read-only link for sharing. Keep the editing link private.</p>
       <p id="share-gallery-name" class="share-gallery-name"></p>
-      <button id="share-gallery-save" class="share-gallery-save" type="button">Save gallery and create link</button>
+      <button id="share-gallery-save" class="share-gallery-save" type="button">Create private and shared links</button>
       <p id="share-gallery-message" class="share-gallery-message" role="status"></p>
       <div id="share-gallery-link-row" class="share-gallery-link-row" hidden>
-        <label for="share-gallery-link">Read-only gallery link</label>
+        <label for="private-gallery-link">Private edit link <span>Keep this link secret</span></label>
+        <div><input id="private-gallery-link" type="text" readonly><button id="private-gallery-copy" type="button">Copy</button></div>
+        <label for="share-gallery-link">Read-only share link</label>
         <div><input id="share-gallery-link" type="text" readonly><button id="share-gallery-copy" type="button">Copy</button></div>
       </div>
     </aside>

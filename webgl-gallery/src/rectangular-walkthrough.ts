@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
+import { isTmdbConfigured, posterUrl, searchMovies } from './lib/tmdb'
 import './rectangular-walkthrough.css'
 
 type CatalogMovie = { id: string; title: string; year: number; posterUrl: string; tone: string; accent: string }
@@ -21,7 +22,7 @@ type GalleryTheme = {
   exposure: number
 }
 
-const catalog: CatalogMovie[] = [
+const starterCatalog: CatalogMovie[] = [
   { id: 'inception', title: 'Inception', year: 2010, posterUrl: 'https://image.tmdb.org/t/p/w780/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg', tone: '#213747', accent: '#d9b77e' },
   { id: 'dark-knight', title: 'The Dark Knight', year: 2008, posterUrl: 'https://image.tmdb.org/t/p/w780/qJ2tW6WMUDux911r6m7haRef0WH.jpg', tone: '#17232e', accent: '#bd6c54' },
   { id: 'godfather', title: 'The Godfather', year: 1972, posterUrl: 'https://image.tmdb.org/t/p/w780/3bhkrj58Vtu7enYsRolD1fZdja1.jpg', tone: '#54372d', accent: '#ddbd8e' },
@@ -31,6 +32,11 @@ const catalog: CatalogMovie[] = [
   { id: 'parasite', title: 'Parasite', year: 2019, posterUrl: 'https://image.tmdb.org/t/p/w780/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg', tone: '#50635c', accent: '#b9d6c3' },
   { id: 'la-la-land', title: 'La La Land', year: 2016, posterUrl: 'https://image.tmdb.org/t/p/w780/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg', tone: '#244567', accent: '#f1a85b' },
 ]
+let catalog = [...starterCatalog]
+let tmdbSearchPending = false
+let tmdbSearchError = ''
+let tmdbSearchController: AbortController | null = null
+let tmdbSearchTimer = 0
 
 // This is the user-supplied route plan.  A movie always fills the first empty
 // canvas in this list; it never depends on camera position or mesh traversal order.
@@ -57,7 +63,8 @@ const defaultTheme: GalleryTheme = {
 }
 const query = new URLSearchParams(window.location.search)
 const shareId = query.get('share')
-const viewerMode = Boolean(shareId)
+const editId = query.get('edit')
+const viewerMode = Boolean(shareId) && !editId
 const normaliseGalleryName = (value: string) => value.trim().replace(/\s+/g, ' ').slice(0, 50)
 const nameFromEntry = normaliseGalleryName(query.get('gallery') ?? '')
 let galleryName = nameFromEntry || normaliseGalleryName(localStorage.getItem(galleryNameStorageKey) ?? '') || 'My Movie Gallery'
@@ -70,7 +77,11 @@ const readAssignments = () => {
 }
 let assignments = readAssignments()
 let galleryTheme: GalleryTheme = { ...defaultTheme }
-const saveAssignments = () => { if (!viewerMode) localStorage.setItem(storageKey, JSON.stringify(assignments)) }
+const saveAssignments = () => {
+  if (viewerMode) return
+  localStorage.setItem(storageKey, JSON.stringify(assignments))
+  if (editId) void savePrivateGallery()
+}
 
 const canvas = document.querySelector<HTMLCanvasElement>('#gallery-canvas')!
 const status = document.querySelector<HTMLElement>('#walkthrough-status')!
@@ -92,6 +103,8 @@ const shareMessage = document.querySelector<HTMLElement>('#share-gallery-message
 const shareLinkRow = document.querySelector<HTMLElement>('#share-gallery-link-row')!
 const shareLink = document.querySelector<HTMLInputElement>('#share-gallery-link')!
 const shareCopy = document.querySelector<HTMLButtonElement>('#share-gallery-copy')!
+const privateLink = document.querySelector<HTMLInputElement>('#private-gallery-link')!
+const privateCopy = document.querySelector<HTMLButtonElement>('#private-gallery-copy')!
 
 function updateGalleryIdentity(name: string) {
   galleryName = normaliseGalleryName(name) || 'My Movie Gallery'
@@ -360,17 +373,75 @@ function renderPanel() {
   const occupiedCount = assignments.filter((assignment) => canvasSlots.some((slot) => slot.id === assignment.slotId)).length
   emptyState.hidden = occupiedCount > 0
   const term = search.value.trim().toLowerCase()
-  const matchingMovies = catalog.filter((movie) => movie.title.toLowerCase().includes(term))
+  const matchingMovies = term ? catalog : starterCatalog
   const assignedIds = new Set(assignments.map((assignment) => assignment.id))
-  results.innerHTML = matchingMovies.length
-    ? matchingMovies.map((movie) => `<button class="movie-result ${selectedMovie?.id === movie.id ? 'is-selected' : ''} ${assignedIds.has(movie.id) ? 'is-added' : ''}" type="button" data-movie-id="${movie.id}" ${assignedIds.has(movie.id) ? 'data-list-action="remove"' : ''}><img class="movie-result-poster" src="${movie.posterUrl}" alt=""><span class="movie-result-copy"><strong>${movie.title}</strong><span>${movie.year}</span></span><span class="movie-result-state">${assignedIds.has(movie.id) ? 'Remove' : 'Select'}</span></button>`).join('')
-    : '<p class="movie-list-empty">No matching films. Try another title.</p>'
+  results.innerHTML = tmdbSearchPending
+    ? '<p class="movie-list-empty">Searching TMDB…</p>'
+    : tmdbSearchError
+      ? `<p class="movie-list-empty">${tmdbSearchError}</p>`
+      : matchingMovies.length
+    ? matchingMovies.map((movie) => `<button class="movie-result ${selectedMovie?.id === movie.id ? 'is-selected' : ''} ${assignedIds.has(movie.id) ? 'is-added' : ''}" type="button" data-movie-id="${movie.id}" ${assignedIds.has(movie.id) ? 'data-list-action="remove"' : ''}><img class="movie-result-poster" src="${movie.posterUrl}" alt=""><span class="movie-result-copy"><strong>${movie.title}</strong><span>${movie.year || 'Year unavailable'}</span></span><span class="movie-result-state">${assignedIds.has(movie.id) ? 'Remove' : 'Select'}</span></button>`).join('')
+    : '<p class="movie-list-empty">No films found. Try another title.</p>'
   if (!selectedMovie) selection.hidden = true
   else {
     selection.hidden = false
-    selection.innerHTML = `<div class="selection-film"><img class="selected-movie-poster" src="${selectedMovie.posterUrl}" alt=""><div><h3>${selectedMovie.title}</h3><p>${selectedMovie.year} · Ready for the next red canvas</p></div></div><label class="rating-label">Your rating</label><div class="rating-controls" role="radiogroup" aria-label="Rating for ${selectedMovie.title}">${[1, 2, 3, 4, 5].map((rating) => `<button class="rating-button ${rating <= selectedRating ? 'is-active' : ''}" type="button" data-rating="${rating}" role="radio" aria-checked="${rating === selectedRating}" aria-label="${rating} out of 5">★</button>`).join('')}</div><label class="movie-note-label" for="movie-note">Short note <span>optional</span></label><textarea id="movie-note" class="movie-note" maxlength="160" placeholder="What stayed with you after the credits?">${selectedNote}</textarea><button class="add-movie-button" type="button" ${selectedRating ? '' : 'disabled'}>Add to gallery</button>`
+    selection.innerHTML = `<div class="selection-film"><img class="selected-movie-poster" src="${selectedMovie.posterUrl}" alt=""><div><h3>${selectedMovie.title}</h3><p>${selectedMovie.year || 'Year unavailable'} · Ready for the next red canvas</p></div></div><label class="rating-label">Your rating</label><div class="rating-controls" role="radiogroup" aria-label="Rating for ${selectedMovie.title}">${[1, 2, 3, 4, 5].map((rating) => `<button class="rating-button ${rating <= selectedRating ? 'is-active' : ''}" type="button" data-rating="${rating}" role="radio" aria-checked="${rating === selectedRating}" aria-label="${rating} out of 5">★</button>`).join('')}</div><label class="movie-note-label" for="movie-note">Short note <span>optional</span></label><textarea id="movie-note" class="movie-note" maxlength="160" placeholder="What stayed with you after the credits?">${selectedNote}</textarea><button class="add-movie-button" type="button" ${selectedRating ? '' : 'disabled'}>Add to gallery</button>`
   }
   capacity.textContent = canvasSlots.length ? `${occupiedCount} of ${canvasSlots.length} display canvases occupied` : 'Preparing display canvases…'
+}
+
+function filmColors(id: number) {
+  const hue = Math.abs(id * 47) % 360
+  return { tone: `hsl(${hue} 28% 25%)`, accent: `hsl(${hue} 58% 68%)` }
+}
+function fallbackPoster() {
+  return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="185" height="278" viewBox="0 0 185 278"%3E%3Crect width="185" height="278" fill="%23291416"/%3E%3C/svg%3E'
+}
+async function searchTmdbMovies() {
+  const term = search.value.trim()
+  window.clearTimeout(tmdbSearchTimer)
+  tmdbSearchController?.abort()
+  if (!term) {
+    catalog = [...starterCatalog]
+    tmdbSearchPending = false
+    tmdbSearchError = ''
+    renderPanel()
+    return
+  }
+  if (!isTmdbConfigured) {
+    catalog = []
+    tmdbSearchPending = false
+    tmdbSearchError = 'Add VITE_TMDB_API_KEY in Vercel, then redeploy to search TMDB.'
+    renderPanel()
+    return
+  }
+  tmdbSearchPending = true
+  tmdbSearchError = ''
+  renderPanel()
+  tmdbSearchTimer = window.setTimeout(async () => {
+    const controller = new AbortController()
+    tmdbSearchController = controller
+    try {
+      const movies = await searchMovies(term, controller.signal)
+      if (controller.signal.aborted) return
+      catalog = movies.map((movie) => ({
+        id: `tmdb-${movie.tmdbId}`,
+        title: movie.title,
+        year: movie.releaseYear ?? 0,
+        posterUrl: posterUrl(movie.posterPath) ?? fallbackPoster(),
+        ...filmColors(movie.tmdbId),
+      }))
+    } catch (error) {
+      if (controller.signal.aborted) return
+      catalog = []
+      tmdbSearchError = error instanceof Error ? `${error.message} Try again.` : 'TMDB search could not be completed. Try again.'
+    } finally {
+      if (!controller.signal.aborted) {
+        tmdbSearchPending = false
+        renderPanel()
+      }
+    }
+  }, 300)
 }
 
 function addSelectedMovie() {
@@ -416,40 +487,57 @@ function publicShareUrl(id: string) {
   url.searchParams.set('share', id)
   return url.toString()
 }
+function privateEditUrl(id: string) {
+  const url = new URL('/rectangular-gallery.html', window.location.href)
+  url.searchParams.set('edit', id)
+  return url.toString()
+}
 async function saveAndShareGallery() {
   if (!supabase || !isSupabaseConfigured) {
     shareMessage.textContent = 'Sharing is not configured for this gallery yet.'
     return
   }
   shareSave.disabled = true
-  shareSave.textContent = 'Saving gallery…'
+  shareSave.textContent = 'Creating links…'
   shareMessage.textContent = ''
   shareLinkRow.hidden = true
-  const { data, error } = await supabase.rpc('create_gallery_share_v2', {
+  const { data, error } = await supabase.rpc('create_gallery_links', {
     p_gallery_name: galleryName,
     p_assignments: assignments,
     p_theme: galleryTheme,
   })
   shareSave.disabled = false
-  shareSave.textContent = 'Save gallery and create link'
-  if (error || typeof data !== 'string') {
-    shareMessage.textContent = 'Sharing needs the gallery-share theme migration before a link can be created.'
+  shareSave.textContent = 'Create private and shared links'
+  const record = Array.isArray(data) ? data[0] : data
+  if (error || !record || typeof record.edit_id !== 'string' || typeof record.share_id !== 'string') {
+    shareMessage.textContent = 'Sharing needs the private gallery links migration before links can be created.'
     return
   }
-  shareLink.value = publicShareUrl(data)
+  privateLink.value = privateEditUrl(record.edit_id)
+  shareLink.value = publicShareUrl(record.share_id)
   shareLinkRow.hidden = false
-  shareMessage.textContent = 'Saved. Anyone with this link can view this snapshot only.'
+  shareMessage.textContent = 'Both links are ready. The private link can edit; the shared link is view-only.'
 }
-async function copyShareLink() {
+async function copyLink(input: HTMLInputElement, button: HTMLButtonElement) {
   try {
-    await navigator.clipboard.writeText(shareLink.value)
-    shareCopy.textContent = 'Copied'
-    window.setTimeout(() => { shareCopy.textContent = 'Copy' }, 1600)
+    await navigator.clipboard.writeText(input.value)
+    button.textContent = 'Copied'
+    window.setTimeout(() => { button.textContent = 'Copy' }, 1600)
   } catch {
-    shareLink.focus()
-    shareLink.select()
+    input.focus()
+    input.select()
     shareMessage.textContent = 'Copy the selected link to share this gallery.'
   }
+}
+async function savePrivateGallery() {
+  if (!editId || !supabase || !isSupabaseConfigured) return
+  const { error } = await supabase.rpc('update_gallery_edit', {
+    p_edit_id: editId,
+    p_gallery_name: galleryName,
+    p_assignments: assignments,
+    p_theme: galleryTheme,
+  })
+  if (error) status.textContent = 'Your private gallery could not be saved. Check your connection and try again.'
 }
 function isMovieAssignment(value: unknown): value is MovieAssignment {
   if (!value || typeof value !== 'object') return false
@@ -480,10 +568,32 @@ async function loadSharedGallery() {
   }
   status.textContent = `Viewing ${galleryName}`
 }
+async function loadPrivateGallery() {
+  if (!editId) return
+  if (!supabase || !isSupabaseConfigured) {
+    status.textContent = 'This private gallery is not available right now.'
+    return
+  }
+  const { data, error } = await supabase.rpc('read_gallery_edit', { p_edit_id: editId })
+  const record = Array.isArray(data) ? data[0] : data
+  if (error || !record || typeof record.gallery_name !== 'string' || !Array.isArray(record.assignments)) {
+    status.textContent = 'This private gallery link is unavailable.'
+    return
+  }
+  assignments = record.assignments.filter(isMovieAssignment)
+  applyTheme(sanitiseTheme(record.theme))
+  updateGalleryIdentity(record.gallery_name)
+  if (canvasSlots.length) {
+    alignAssignmentsToRoute()
+    refreshPresentations()
+    renderPanel()
+  }
+  status.textContent = `Editing ${galleryName}`
+}
 
 trigger.addEventListener('click', openPanel)
 closePanelButton.addEventListener('click', closePanel)
-search.addEventListener('input', renderPanel)
+search.addEventListener('input', () => { void searchTmdbMovies() })
 panel.addEventListener('click', (event) => {
   const target = event.target as HTMLElement
   const movieButton = target.closest<HTMLButtonElement>('[data-movie-id]')
@@ -510,8 +620,10 @@ window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !p
 shareTrigger.addEventListener('click', openSharePanel)
 shareClose.addEventListener('click', closeSharePanel)
 shareSave.addEventListener('click', () => { void saveAndShareGallery() })
-shareCopy.addEventListener('click', () => { void copyShareLink() })
+shareCopy.addEventListener('click', () => { void copyLink(shareLink, shareCopy) })
+privateCopy.addEventListener('click', () => { void copyLink(privateLink, privateCopy) })
 void loadSharedGallery()
+void loadPrivateGallery()
 
 new GLTFLoader().load('/rectangular-plan-gallery.glb', (gltf) => {
   const candidates = new Map<string, THREE.Mesh>()

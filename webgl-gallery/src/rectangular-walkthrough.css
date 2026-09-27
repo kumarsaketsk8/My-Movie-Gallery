@@ -30,7 +30,9 @@ body.is-dragging #gallery-canvas { cursor: grabbing; }
 .share-gallery-save:disabled { opacity: .56; }
 .share-gallery-message { min-height: 18px; margin: 12px 0 0; color: #e6c78b; font: 12px/1.45 Arial, sans-serif; }
 .share-gallery-link-row { margin-top: 16px; }
-.share-gallery-link-row label { display: block; margin-bottom: 8px; color: #ead7bb; font: 700 11px/1.2 Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.share-gallery-link-row label { display: block; margin: 16px 0 8px; color: #ead7bb; font: 700 11px/1.2 Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.share-gallery-link-row label:first-child { margin-top: 0; }
+.share-gallery-link-row label span { color: #d7ab68; font-weight: 400; letter-spacing: .04em; }
 .share-gallery-link-row div { display: flex; gap: 8px; }
 .share-gallery-link-row input { min-width: 0; flex: 1; height: 44px; padding: 0 12px; border: 1px solid rgba(247,223,177,.2); border-radius: 4px; color: #f7e5bd; background: rgba(5,3,4,.55); font: 12px/1 Arial, sans-serif; }
 .share-gallery-copy button { width: 76px; flex: 0 0 76px; }
