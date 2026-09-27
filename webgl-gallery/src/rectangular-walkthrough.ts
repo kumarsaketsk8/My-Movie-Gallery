@@ -239,6 +239,13 @@ let selectedNote = ''
 const posterTextures = new Map<string, THREE.Texture>()
 const posterLoader = new THREE.TextureLoader()
 
+function textureUrl(posterUrl: string) {
+  // Galleries saved before the poster proxy was added contain direct TMDB URLs.
+  // Rewrite those legacy URLs so their real posters also work as WebGL textures.
+  const match = posterUrl.match(/^https:\/\/image\.tmdb\.org\/t\/p\/[^/]+(\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))$/i)
+  return match ? `/api/tmdb-poster?path=${encodeURIComponent(match[1])}` : posterUrl
+}
+
 function posterFallback(movie: CatalogMovie) {
   const posterCanvas = document.createElement('canvas')
   posterCanvas.width = 600
@@ -271,7 +278,7 @@ function textureFor(movie: CatalogMovie) {
   if (existing) return existing
   const fallback = posterFallback(movie)
   posterTextures.set(movie.id, fallback)
-  posterLoader.load(movie.posterUrl, (texture) => {
+  posterLoader.load(textureUrl(movie.posterUrl), (texture) => {
     texture.colorSpace = THREE.SRGBColorSpace
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
     posterTextures.set(movie.id, texture)
