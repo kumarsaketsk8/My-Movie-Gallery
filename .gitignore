@@ -1,0 +1,10 @@
+# Generated and machine-local files
+.DS_Store
+**/.DS_Store
+**/node_modules/
+**/dist/
+**/.env.local
+**/*.blend1
+
+# Logs
+*.log

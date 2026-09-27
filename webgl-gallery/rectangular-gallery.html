@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Interactive walkthrough of the rectangular gallery plan." />
+    <title>Rectangular Gallery Walkthrough</title>
+  </head>
+  <body class="walkthrough-page">
+    <canvas id="gallery-canvas" aria-label="Interactive rectangular gallery walkthrough"></canvas>
+    <nav class="gallery-actions" aria-label="Gallery actions">
+      <a id="exit-return" class="exit-return" href="http://127.0.0.1:5173/">Exit Gallery</a>
+      <button id="movie-list-trigger" class="movie-list-trigger" type="button">Add My Movie List</button>
+    </nav>
+    <button id="share-gallery-trigger" class="share-gallery-trigger" type="button">Save &amp; Share</button>
+    <a id="create-own-gallery" class="create-own-gallery" href="http://127.0.0.1:5173/">Create my own gallery</a>
+    <aside id="movie-list-panel" class="movie-list-panel" aria-labelledby="movie-list-title" aria-hidden="true" hidden>
+      <header class="movie-list-header">
+        <div>
+          <p class="panel-eyebrow">Curator’s desk</p>
+          <h2 id="movie-list-title">My Movie List</h2>
+        </div>
+        <button id="movie-list-close" class="panel-close" type="button" aria-label="Close My Movie List">×</button>
+      </header>
+      <p id="movie-list-empty" class="movie-list-empty">Your list is empty. Add watched films and they will appear, in order, across the red fabric canvases throughout this gallery.</p>
+      <label class="movie-search-label" for="movie-list-search">Search films</label>
+      <div class="movie-search-field">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
+        <input id="movie-list-search" type="search" autocomplete="off" placeholder="Search by title…">
+      </div>
+      <section id="movie-search-results" class="movie-search-results" aria-live="polite"></section>
+      <section id="movie-selection" class="movie-selection" hidden aria-live="polite"></section>
+      <p id="movie-list-capacity" class="movie-list-capacity" role="status"></p>
+    </aside>
+    <aside id="share-gallery-panel" class="share-gallery-panel" aria-labelledby="share-gallery-title" aria-hidden="true" hidden>
+      <header class="share-gallery-header">
+        <div>
+          <p class="panel-eyebrow">Private collection</p>
+          <h2 id="share-gallery-title">Save &amp; Share</h2>
+        </div>
+        <button id="share-gallery-close" class="panel-close" type="button" aria-label="Close Save and Share">×</button>
+      </header>
+      <p class="share-gallery-copy">Save a read-only snapshot of this gallery, including its movie placements and visual theme. Friends with the link can walk through it, but cannot edit it.</p>
+      <p id="share-gallery-name" class="share-gallery-name"></p>
+      <button id="share-gallery-save" class="share-gallery-save" type="button">Save gallery and create link</button>
+      <p id="share-gallery-message" class="share-gallery-message" role="status"></p>
+      <div id="share-gallery-link-row" class="share-gallery-link-row" hidden>
+        <label for="share-gallery-link">Read-only gallery link</label>
+        <div><input id="share-gallery-link" type="text" readonly><button id="share-gallery-copy" type="button">Copy</button></div>
+      </div>
+    </aside>
+    <p id="walkthrough-status" class="walkthrough-status" role="status">Preparing the gallery…</p>
+    <script type="module" src="/src/rectangular-walkthrough.ts"></script>
+  </body>
+</html>
