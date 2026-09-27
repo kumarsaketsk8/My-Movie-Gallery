@@ -94,7 +94,7 @@ export function initEntryDesk() {
       localStorage.setItem(storageKey, galleryName)
       updateTitle(galleryName)
       window.setTimeout(() => {
-        const walkthrough = new URL('http://127.0.0.1:5174/rectangular-gallery.html')
+        const walkthrough = new URL('/rectangular-gallery.html', window.location.origin)
         walkthrough.searchParams.set('gallery', galleryName)
         window.location.assign(walkthrough)
       }, 1000)

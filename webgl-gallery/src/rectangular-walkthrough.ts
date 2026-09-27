@@ -96,7 +96,7 @@ const shareCopy = document.querySelector<HTMLButtonElement>('#share-gallery-copy
 function updateGalleryIdentity(name: string) {
   galleryName = normaliseGalleryName(name) || 'My Movie Gallery'
   document.title = `${galleryName} · Movie Gallery`
-  const entry = new URL('http://127.0.0.1:5173/')
+  const entry = new URL('/', window.location.origin)
   entry.searchParams.set('gallery', galleryName)
   exitReturn.href = entry.toString()
   shareName.textContent = galleryName
