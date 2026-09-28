@@ -105,6 +105,10 @@ const shareLink = document.querySelector<HTMLInputElement>('#share-gallery-link'
 const shareCopy = document.querySelector<HTMLButtonElement>('#share-gallery-copy')!
 const privateLink = document.querySelector<HTMLInputElement>('#private-gallery-link')!
 const privateCopy = document.querySelector<HTMLButtonElement>('#private-gallery-copy')!
+const mobileJoystick = document.querySelector<HTMLElement>('#mobile-joystick')!
+const mobileJoystickThumb = document.querySelector<HTMLElement>('#mobile-joystick-thumb')!
+const isTouchDevice = window.matchMedia('(pointer: coarse)')
+const movementHint = () => isTouchDevice.matches ? 'Use the joystick to walk · drag to look' : 'Click and drag to look · WASD to explore'
 
 function updateGalleryIdentity(name: string) {
   galleryName = normaliseGalleryName(name) || 'My Movie Gallery'
@@ -666,7 +670,7 @@ new GLTFLoader().load('/rectangular-plan-gallery.glb', (gltf) => {
   refreshPresentations()
   renderPanel()
   loaded = true
-  status.textContent = viewerMode ? `Viewing ${galleryName}` : 'Click and drag to look · WASD to explore'
+  status.textContent = viewerMode ? `Viewing ${galleryName}` : movementHint()
 }, undefined, () => { status.textContent = 'The gallery model could not be loaded. Reload to try again.' })
 
 const held = new Set<string>()
@@ -679,10 +683,12 @@ window.addEventListener('keydown', (event) => {
   held.add(event.code)
 })
 window.addEventListener('keyup', (event) => held.delete(event.code))
-window.addEventListener('blur', () => held.clear())
+window.addEventListener('blur', () => { held.clear(); resetJoystick() })
 
 let dragging = false
 let lastPointer = { x: 0, y: 0 }
+let joystickPointerId: number | null = null
+let joystickMove = { x: 0, y: 0 }
 
 function applyLook(deltaX: number, deltaY: number) {
   yaw -= deltaX * .004
@@ -707,11 +713,50 @@ function stopDragging(event: PointerEvent) {
   dragging = false
   if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
   document.body.classList.remove('is-dragging')
-  status.textContent = 'Click and drag to look · WASD to explore'
+  status.textContent = movementHint()
   status.classList.remove('is-hidden')
 }
 canvas.addEventListener('pointerup', stopDragging)
 canvas.addEventListener('pointercancel', stopDragging)
+
+function updateJoystick(event: PointerEvent) {
+  const bounds = mobileJoystick.getBoundingClientRect()
+  const maximum = Math.min(bounds.width, bounds.height) * .27
+  let offsetX = event.clientX - (bounds.left + bounds.width / 2)
+  let offsetY = event.clientY - (bounds.top + bounds.height / 2)
+  const distance = Math.hypot(offsetX, offsetY)
+  if (distance > maximum) {
+    offsetX = offsetX / distance * maximum
+    offsetY = offsetY / distance * maximum
+  }
+  joystickMove = { x: offsetX / maximum, y: -offsetY / maximum }
+  mobileJoystickThumb.style.setProperty('--joystick-x', `${offsetX}px`)
+  mobileJoystickThumb.style.setProperty('--joystick-y', `${offsetY}px`)
+}
+function resetJoystick() {
+  joystickPointerId = null
+  joystickMove = { x: 0, y: 0 }
+  mobileJoystickThumb.style.setProperty('--joystick-x', '0px')
+  mobileJoystickThumb.style.setProperty('--joystick-y', '0px')
+  mobileJoystick.classList.remove('is-active')
+}
+mobileJoystick.addEventListener('pointerdown', (event) => {
+  if (event.pointerType === 'mouse') return
+  event.preventDefault()
+  joystickPointerId = event.pointerId
+  mobileJoystick.setPointerCapture(event.pointerId)
+  mobileJoystick.classList.add('is-active')
+  updateJoystick(event)
+})
+mobileJoystick.addEventListener('pointermove', (event) => {
+  if (event.pointerId === joystickPointerId) updateJoystick(event)
+})
+mobileJoystick.addEventListener('pointerup', (event) => {
+  if (event.pointerId === joystickPointerId) resetJoystick()
+})
+mobileJoystick.addEventListener('pointercancel', (event) => {
+  if (event.pointerId === joystickPointerId) resetJoystick()
+})
 
 function walkable(x: number, z: number) {
   if (x < -13.35 || x > 13.35 || z < -16.35 || z > 16.35) return false
@@ -730,11 +775,11 @@ function render(now: number) {
   const delta = Math.min(.05, Math.max(.001, (now - previous) / 1000))
   previous = now
   if (loaded) {
-    const forward = Number(held.has('KeyW')) - Number(held.has('KeyS'))
-    const strafe = Number(held.has('KeyD')) - Number(held.has('KeyA'))
+    const forward = Number(held.has('KeyW')) - Number(held.has('KeyS')) + joystickMove.y
+    const strafe = Number(held.has('KeyD')) - Number(held.has('KeyA')) + joystickMove.x
     if (forward || strafe) {
       const length = Math.hypot(forward, strafe) || 1
-      const speed = 5.8 * delta / length
+      const speed = 5.8 * delta / Math.max(1, length)
       const forwardX = -Math.sin(yaw)
       const forwardZ = -Math.cos(yaw)
       const rightX = Math.cos(yaw)
