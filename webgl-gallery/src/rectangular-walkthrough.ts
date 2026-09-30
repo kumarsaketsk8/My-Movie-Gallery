@@ -2,7 +2,10 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { isTmdbConfigured, posterUrl, searchMovies } from './lib/tmdb'
+import { mountAgentation } from './lib/agentation'
 import './rectangular-walkthrough.css'
+
+void mountAgentation()
 
 type CatalogMovie = { id: string; title: string; year: number; posterUrl: string; tone: string; accent: string }
 type MovieAssignment = CatalogMovie & { rating: number; note: string; slotId: string }
@@ -105,6 +108,8 @@ const shareLink = document.querySelector<HTMLInputElement>('#share-gallery-link'
 const shareCopy = document.querySelector<HTMLButtonElement>('#share-gallery-copy')!
 const privateLink = document.querySelector<HTMLInputElement>('#private-gallery-link')!
 const privateCopy = document.querySelector<HTMLButtonElement>('#private-gallery-copy')!
+const welcome = document.querySelector<HTMLElement>('#gallery-welcome')!
+const welcomeEnter = document.querySelector<HTMLButtonElement>('#gallery-welcome-enter')!
 const mobileJoystick = document.querySelector<HTMLElement>('#mobile-joystick')!
 const mobileJoystickThumb = document.querySelector<HTMLElement>('#mobile-joystick-thumb')!
 const isTouchDevice = window.matchMedia('(pointer: coarse)')
@@ -302,9 +307,11 @@ function textureFor(movie: CatalogMovie) {
 
 function createPresentation(slot: CanvasSlot, assignment: MovieAssignment): Presentation {
   // The narrow horizontal dimension is the board thickness; its normal is the display face.
-  // (The previous comparison used the broad dimension, which mounted frames on board edges.)
+  // The two divider boards are deliberately paired: each poster faces away from
+  // the divider so it is visible from its named west/east gallery side.
   const thinIsX = slot.size.x < slot.size.z
-  const sign = thinIsX ? (slot.center.x < 0 ? 1 : -1) : (slot.center.z < 0 ? 1 : -1)
+  const dividerFace = slot.id === 'Divider board west' ? -1 : slot.id === 'Divider board east' ? 1 : null
+  const sign = dividerFace ?? (thinIsX ? (slot.center.x < 0 ? 1 : -1) : (slot.center.z < 0 ? 1 : -1))
   const normal = new THREE.Vector3(thinIsX ? sign : 0, 0, thinIsX ? 0 : sign)
   const group = new THREE.Group()
   group.name = `Framed poster · ${assignment.title}`
@@ -680,12 +687,14 @@ window.addEventListener('keydown', (event) => {
   if (target?.matches('input, textarea, select, [contenteditable="true"]')) return
   if (!walkKeys.includes(event.code)) return
   event.preventDefault()
+  if (!hasEnteredGallery) return
   held.add(event.code)
 })
 window.addEventListener('keyup', (event) => held.delete(event.code))
 window.addEventListener('blur', () => { held.clear(); resetJoystick() })
 
 let dragging = false
+let hasEnteredGallery = false
 let lastPointer = { x: 0, y: 0 }
 let joystickPointerId: number | null = null
 let joystickMove = { x: 0, y: 0 }
@@ -696,7 +705,7 @@ function applyLook(deltaX: number, deltaY: number) {
   camera.rotation.set(pitch, yaw, 0)
 }
 canvas.addEventListener('pointerdown', (event) => {
-  if (!loaded) return
+  if (!loaded || !hasEnteredGallery) return
   dragging = true
   lastPointer = { x: event.clientX, y: event.clientY }
   canvas.setPointerCapture(event.pointerId)
@@ -741,7 +750,7 @@ function resetJoystick() {
   mobileJoystick.classList.remove('is-active')
 }
 mobileJoystick.addEventListener('pointerdown', (event) => {
-  if (event.pointerType === 'mouse') return
+  if (!hasEnteredGallery || event.pointerType === 'mouse') return
   event.preventDefault()
   joystickPointerId = event.pointerId
   mobileJoystick.setPointerCapture(event.pointerId)
@@ -774,7 +783,7 @@ let previous = performance.now()
 function render(now: number) {
   const delta = Math.min(.05, Math.max(.001, (now - previous) / 1000))
   previous = now
-  if (loaded) {
+  if (loaded && hasEnteredGallery) {
     const forward = Number(held.has('KeyW')) - Number(held.has('KeyS')) + joystickMove.y
     const strafe = Number(held.has('KeyD')) - Number(held.has('KeyA')) + joystickMove.x
     if (forward || strafe) {
@@ -791,6 +800,13 @@ function render(now: number) {
   requestAnimationFrame(render)
 }
 requestAnimationFrame(render)
+welcomeEnter.addEventListener('click', () => {
+  hasEnteredGallery = true
+  welcome.classList.add('is-dismissed')
+  welcome.setAttribute('aria-hidden', 'true')
+  status.textContent = viewerMode ? `Viewing ${galleryName}` : movementHint()
+})
+welcomeEnter.focus()
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight
   camera.updateProjectionMatrix()

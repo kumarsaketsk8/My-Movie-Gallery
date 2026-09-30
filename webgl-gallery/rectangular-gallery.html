@@ -8,6 +8,32 @@
   </head>
   <body class="walkthrough-page">
     <canvas id="gallery-canvas" aria-label="Interactive rectangular gallery walkthrough"></canvas>
+    <section id="gallery-welcome" class="gallery-welcome" aria-labelledby="gallery-welcome-title" aria-modal="true" role="dialog">
+      <div class="gallery-welcome-card">
+        <p class="gallery-welcome-eyebrow">Private screening</p>
+        <h1 id="gallery-welcome-title">Welcome to the gallery</h1>
+        <p class="gallery-welcome-intro">Take a moment to explore your collection at your own pace.</p>
+        <div class="gallery-welcome-controls">
+          <div class="gallery-welcome-control gallery-welcome-desktop-control">
+            <span class="gallery-keyset" aria-label="W A S D keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>
+            <p><strong>Explore the gallery</strong><span>Move between the exhibition walls</span></p>
+          </div>
+          <div class="gallery-welcome-control gallery-welcome-desktop-control">
+            <span class="gallery-pointer" aria-hidden="true"></span>
+            <p><strong>Click and drag to look</strong><span>Turn your view around the room</span></p>
+          </div>
+          <div class="gallery-welcome-control gallery-welcome-touch-control">
+            <span class="gallery-gesture" aria-hidden="true">↔</span>
+            <p><strong>Drag to look around</strong><span>Move your finger across the gallery</span></p>
+          </div>
+          <div class="gallery-welcome-control gallery-welcome-touch-control">
+            <span class="gallery-joystick-icon" aria-hidden="true"><i></i></span>
+            <p><strong>Use the joystick to walk</strong><span>Guide yourself between the displays</span></p>
+          </div>
+        </div>
+        <button id="gallery-welcome-enter" class="gallery-welcome-enter" type="button">Enter gallery <span aria-hidden="true">→</span></button>
+      </div>
+    </section>
     <nav class="gallery-actions" aria-label="Gallery actions">
       <a id="exit-return" class="exit-return" href="/">Exit Gallery</a>
       <button id="movie-list-trigger" class="movie-list-trigger" type="button">Add My Movie List</button>

@@ -1,10 +1,13 @@
 import './style.css'
 import { initEntryDesk } from './entry'
+import { mountAgentation } from './lib/agentation'
 import Lenis from 'lenis'
 import gsap from 'gsap'
 import * as THREE from 'three'
 import { Reflector } from 'three/addons/objects/Reflector.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+
+void mountAgentation()
 
 type GalleryItem = {
   id: string
